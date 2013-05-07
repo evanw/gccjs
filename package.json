@@ -1,0 +1,14 @@
+{
+  "name": "gccjs",
+  "description": "A simple build tool that uses Google Closure Compiler",
+  "version": "0.0.1",
+  "bin": {
+    "gccjs": "./run.py"
+  },
+  "scripts": {
+    "install": "./install.sh"
+  },
+  "dependencies": {
+    "terminal-notifier": "0.1.0"
+  }
+}
