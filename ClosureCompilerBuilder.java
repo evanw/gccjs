@@ -69,6 +69,7 @@ class ProjectDescription {
   Define[] defines; // Equivalent to compiler.jar's "--define" flag
   String[] before; // Commands to run before compilation
   String[] after; // Commands to run after compilation
+  String wrapper; // Equivalent to compiler.jar's "--output_wrapper" flag
   long[] lastSourceTimes;
   long[] lastExternTimes;
 
@@ -78,6 +79,7 @@ class ProjectDescription {
     externs = Globals.parseStrings(contents, "externs");
     before = Globals.parseStrings(contents, "before");
     after = Globals.parseStrings(contents, "after");
+    wrapper = contents.optString("wrapper", "%output%");
     lastSourceTimes = new long[sources.length];
     lastExternTimes = new long[externs.length];
 
@@ -426,7 +428,7 @@ public class ClosureCompilerBuilder {
       reportError(e);
       return false;
     }
-    writer.print(compiler.toSource());
+    writer.println(project.wrapper.replace("%output%", compiler.toSource()));
     writer.close();
     return true;
   }
@@ -546,7 +548,8 @@ public class ClosureCompilerBuilder {
     System.out.println("  \"externs\": [\"jquery.externs.js\"],");
     System.out.println("  \"before\": [\"before.sh\"],");
     System.out.println("  \"after\": [\"after.sh\"],");
-    System.out.println("  \"defines\": { \"LOGGING\": true }");
+    System.out.println("  \"defines\": { \"LOGGING\": true },");
+    System.out.println("  \"wrapper\": \"(function() {%output%})();\"");
     System.out.println("}");
     System.out.println();
   }

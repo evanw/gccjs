@@ -22,5 +22,17 @@ A simple build tool that uses Google Closure Compiler's Java API to watch files 
       "externs": ["jquery.externs.js"],
       "before": ["before.sh"],
       "after": ["after.sh"],
-      "defines": { "LOGGING": true }
+      "defines": { "LOGGING": true },
+      "wrapper": "(function() {%output%})();"
     }
+
+### Example usage
+
+    $ sudo npm install -g gccjs
+    $ echo '/** @type {number} */ var foo = false;' > foo.js
+    $ echo '{ "target": "out.js", "sources": ["foo.js"] }' > project.json
+    $ gccjs --watch
+    Warning: initializing variable (line 1 of foo.js)
+    found   : boolean
+    required: number
+    Success (4.5 seconds)
