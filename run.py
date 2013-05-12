@@ -10,6 +10,6 @@ dir = os.path.dirname(os.path.realpath(__file__))
 
 # Forward arguments to the builder
 try:
-  sys.exit(subprocess.call(['java', '-cp', dir + ':' + dir + '/compiler.jar', 'ClosureCompilerBuilder'] + sys.argv[1:]))
+  sys.exit(subprocess.call(['java', '-cp', dir + '/src:' + dir + '/compiler.jar', 'com.google.javascript.jscomp.ClosureCompilerBuilder'] + sys.argv[1:]))
 except KeyboardInterrupt:
   sys.exit(1)

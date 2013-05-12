@@ -1,15 +1,16 @@
-import org.json.*;
+// Need to be in this package to use PassFactory
+package com.google.javascript.jscomp;
+
+import com.google.common.base.*;
+import com.google.common.io.*;
+import com.google.javascript.jscomp.Compiler;
 import java.io.*;
-import java.net.*;
 import java.util.*;
-import java.util.logging.*;
 import java.util.concurrent.*;
+import java.util.logging.*;
+import org.json.*;
 import org.kohsuke.args4j.*;
 import org.kohsuke.args4j.spi.*;
-import com.google.common.io.*;
-import com.google.common.base.*;
-import com.google.javascript.jscomp.*;
-import com.google.javascript.jscomp.Compiler;
 
 class Flags {
   @Option(
@@ -95,11 +96,12 @@ class ProjectDescription {
     }
   }
 
-  Define parseDefine(JSONObject object, final String name) throws JSONException {
+  static Define parseDefine(JSONObject object, final String name) throws JSONException {
     final Object property = object.get(name);
     if (property instanceof Boolean) {
       final boolean data = object.getBoolean(name);
       return new Define() {
+        @Override
         public void apply(CompilerOptions options) {
           options.setDefineToBooleanLiteral(name, data);
         }
@@ -107,6 +109,7 @@ class ProjectDescription {
     } else if (property instanceof Number) {
       final double data = object.getDouble(name);
       return new Define() {
+        @Override
         public void apply(CompilerOptions options) {
           options.setDefineToDoubleLiteral(name, data);
         }
@@ -114,6 +117,7 @@ class ProjectDescription {
     } else {
       final String data = object.getString(name);
       return new Define() {
+        @Override
         public void apply(CompilerOptions options) {
           options.setDefineToStringLiteral(name, data);
         }
@@ -124,7 +128,9 @@ class ProjectDescription {
 
 class Globals {
   static String[] parseStrings(JSONObject json, String key) throws JSONException {
-    if (!json.has(key)) return new String[0];
+    if (!json.has(key)) {
+      return new String[0];
+    }
     JSONArray array = json.getJSONArray(key);
     String[] strings = new String[array.length()];
     for (int i = 0; i < strings.length; i++) {
@@ -151,7 +157,9 @@ class Globals {
 
     // Step into path
     for (int j = i; j < pathParts.length; j++) {
-      if (j > i) result += File.separator;
+      if (j > i) {
+        result += File.separator;
+      }
       result += pathParts[j];
     }
 
@@ -189,6 +197,28 @@ class Globals {
   }
 }
 
+class CustomPassConfig extends DefaultPassConfig {
+  Flags flags;
+
+  CustomPassConfig(CompilerOptions options, Flags flags) {
+    super(options);
+    this.flags = flags;
+  }
+
+  @Override
+  protected List<PassFactory> getOptimizations() {
+    List<PassFactory> optimizations = new ArrayList<PassFactory>();
+    optimizations.add(new PassFactory("optimizeWebGL", false) {
+      @Override
+      CompilerPass create(AbstractCompiler compiler) {
+        return new OptimizeWebGLPass(compiler);
+      }
+    });
+    optimizations.addAll(super.getOptimizations());
+    return optimizations;
+  }
+}
+
 enum ErrorType {
   ERROR,
   WARNING
@@ -206,6 +236,7 @@ public class ClosureCompilerBuilder {
 
   // Wrap getDefaultExterns() in a lambda to catch IOException
   static final List<SourceFile> defaultExterns = new Callable<List<SourceFile>>() {
+    @Override
     public List<SourceFile> call() {
       try {
         return CommandLineRunner.getDefaultExterns();
@@ -219,7 +250,9 @@ public class ClosureCompilerBuilder {
     this.flags = flags;
 
     // Watching implies checking (otherwise, why are you watching?)
-    if (flags.watchFiles) flags.checkTypes = true;
+    if (flags.watchFiles) {
+      flags.checkTypes = true;
+    }
   }
 
   void parseProject() {
@@ -240,7 +273,6 @@ public class ClosureCompilerBuilder {
       project = new ProjectDescription(new JSONObject(contents));
     } catch (JSONException e) {
       reportError("Could not parse " + flags.projectFile + ": " + e.getMessage());
-      return;
     }
   }
 
@@ -281,14 +313,20 @@ public class ClosureCompilerBuilder {
     WarningLevel.VERBOSE.setOptionsForWarningLevel(options);
     CompilationLevel.ADVANCED_OPTIMIZATIONS.setOptionsForCompilationLevel(options);
     CompilationLevel.ADVANCED_OPTIMIZATIONS.setTypeBasedOptimizationOptions(options);
-    for (Define define : project.defines) define.apply(options);
+    for (Define define : project.defines) {
+      define.apply(options);
+    }
     options.ideMode = !flags.optimizedBuild;
     options.setTrustedStrings(true);
 
     // Run the compiler without printing anything
-    compiler.setLoggingLevel(Level.OFF);
+    Compiler.setLoggingLevel(Level.OFF);
+    compiler.setPassConfig(new CustomPassConfig(options, flags));
     compiler.setErrorManager(new BasicErrorManager() {
+      @Override
       public void println(CheckLevel level, JSError error) {}
+
+      @Override
       protected void printSummary() {}
     });
     Result result = compiler.compileModules(externs, Arrays.asList(module), options);
@@ -380,7 +418,9 @@ public class ClosureCompilerBuilder {
       }
 
       // Build again when files are changed
-      if (isFirstPoll || changed) buildProject();
+      if (isFirstPoll || changed) {
+        buildProject();
+      }
     }
   }
 
@@ -502,12 +542,15 @@ public class ClosureCompilerBuilder {
     }
     Globals.resetColor(); System.out.print(parts[0]);
     Globals.grayColor(); System.out.println(location);
-    if (parts.length > 1) System.out.println(parts[1]);
+    if (parts.length > 1) {
+      System.out.println(parts[1]);
+    }
     Globals.resetColor();
   }
 
   void showPopup(String text, String file, int line) {
-    String TERMINAL_NOTIFIER_PATH = "node_modules/terminal-notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier";
+    String TERMINAL_NOTIFIER_PATH = "../../../../../node_modules/terminal-notifier/" +
+      "terminal-notifier.app/Contents/MacOS/terminal-notifier";
     String path = ClosureCompilerBuilder.class.getResource("ClosureCompilerBuilder.class").getPath();
     path = new File(new File(path).getAbsoluteFile().getParent(), TERMINAL_NOTIFIER_PATH).getAbsolutePath();
     try {
@@ -526,10 +569,14 @@ public class ClosureCompilerBuilder {
 
   static String getEditorOpenCommand(String file, int line) {
     // Note: This doesn't work if the file path contains a single quote
-    if (file == null) return "";
+    if (file == null) {
+      return "";
+    }
     String editor = System.getenv().get("EDITOR");
     file = new File(file).getAbsolutePath();
-    if (editor == null) return "open '" + file + "'";
+    if (editor == null) {
+      return "open '" + file + "'";
+    }
     return editor + " '" + file + ":" + line + "'";
   }
 
@@ -560,8 +607,11 @@ public class ClosureCompilerBuilder {
 
     try {
       parser.parseArgument(args);
-      if (flags.showHelp) usage(parser);
-      else new ClosureCompilerBuilder(flags).run();
+      if (flags.showHelp) {
+        usage(parser);
+      } else {
+        new ClosureCompilerBuilder(flags).run();
+      }
     } catch (CmdLineException e) {
       System.out.println(e.getMessage());
       usage(parser);

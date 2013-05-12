@@ -19,6 +19,6 @@ if [ ! -e compiler.jar ]; then
 fi
 
 # Run the Java compiler if needed
-if [ ! -e ClosureCompilerBuilder.class ]; then
-  javac -cp compiler.jar ClosureCompilerBuilder.java
+if [ ! -e src/com/google/javascript/jscomp/ClosureCompilerBuilder.class ]; then
+  javac -cp compiler.jar src/com/google/javascript/jscomp/*.java
 fi
