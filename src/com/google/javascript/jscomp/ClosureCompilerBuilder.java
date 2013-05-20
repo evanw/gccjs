@@ -200,6 +200,20 @@ class Globals {
 class CustomPassConfig extends DefaultPassConfig {
   Flags flags;
 
+  static final PassFactory optimizeWebGL = new PassFactory("optimizeWebGL", true) {
+    @Override
+    CompilerPass create(AbstractCompiler compiler) {
+      return new OptimizeWebGLPass(compiler);
+    }
+  };
+
+  static final PassFactory peepholeOptimize = new PassFactory("peepholeOptimize", false) {
+    @Override
+    CompilerPass create(AbstractCompiler compiler) {
+      return new PeepholeOptimizePass(compiler);
+    }
+  };
+
   CustomPassConfig(CompilerOptions options, Flags flags) {
     super(options);
     this.flags = flags;
@@ -207,15 +221,21 @@ class CustomPassConfig extends DefaultPassConfig {
 
   @Override
   protected List<PassFactory> getOptimizations() {
-    List<PassFactory> optimizations = new ArrayList<PassFactory>();
-    optimizations.add(new PassFactory("optimizeWebGL", false) {
-      @Override
-      CompilerPass create(AbstractCompiler compiler) {
-        return new OptimizeWebGLPass(compiler);
-      }
-    });
+    ArrayList<PassFactory> optimizations = new ArrayList<PassFactory>();
+    optimizations.add(optimizeWebGL);
     optimizations.addAll(super.getOptimizations());
+    insertAfter(optimizations, "peepholeOptimizations", peepholeOptimize);
+    insertAfter(optimizations, "latePeepholeOptimizations", peepholeOptimize);
     return optimizations;
+  }
+
+  static void insertAfter(ArrayList<PassFactory> factories, String name, PassFactory factory) {
+    int i = 0;
+    while (i < factories.size()) {
+      if (factories.get(i++).getName().equals(name)) {
+        factories.add(i++, factory);
+      }
+    }
   }
 }
 
@@ -232,19 +252,19 @@ public class ClosureCompilerBuilder {
   ProjectDescription project;
   boolean latestBuildSucceeded;
 
-  static DiagnosticType ERROR = DiagnosticType.error("ERROR", "{0}");
+  static final DiagnosticType ERROR = DiagnosticType.error("ERROR", "{0}");
+  static final List<SourceFile> defaultExterns = new ArrayList<SourceFile>();
 
-  // Wrap getDefaultExterns() in a lambda to catch IOException
-  static final List<SourceFile> defaultExterns = new Callable<List<SourceFile>>() {
-    @Override
-    public List<SourceFile> call() {
-      try {
-        return CommandLineRunner.getDefaultExterns();
-      } catch (IOException e) {
-        return new ArrayList<SourceFile>();
-      }
+  static {
+    defaultExterns.add(SourceFile.fromCode("console_log.js",
+      "var console = {};" +
+      "/** @type {function(...)} */ console.log;"));
+
+    try {
+      defaultExterns.addAll(CommandLineRunner.getDefaultExterns());
+    } catch (IOException e) {
     }
-  }.call();
+  }
 
   ClosureCompilerBuilder(Flags flags) {
     this.flags = flags;
