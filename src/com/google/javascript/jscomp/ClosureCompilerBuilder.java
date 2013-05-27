@@ -454,12 +454,20 @@ public class ClosureCompilerBuilder {
     }
 
     // Watch files by polling repeatedly
-    try {
-      while (true) {
+    while (true) {
+      try {
         Thread.sleep(250);
-        poll(false);
+      } catch (InterruptedException e) {
+        break;
       }
-    } catch (InterruptedException e) {
+
+      // Catch internal compiler errors
+      try {
+        poll(false);
+      } catch (Throwable t) {
+        showPopup(t.getMessage(), null, 0);
+        t.printStackTrace();
+      }
     }
   }
 
@@ -630,7 +638,15 @@ public class ClosureCompilerBuilder {
       if (flags.showHelp) {
         usage(parser);
       } else {
-        new ClosureCompilerBuilder(flags).run();
+        // Catch internal compiler errors
+        try {
+          new ClosureCompilerBuilder(flags).run();
+        } catch (Throwable t) {
+          t.printStackTrace();
+
+          // Need to explicitly exit because of extra threads
+          System.exit(1);
+        }
       }
     } catch (CmdLineException e) {
       System.out.println(e.getMessage());
