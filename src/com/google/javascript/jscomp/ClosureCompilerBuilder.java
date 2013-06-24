@@ -75,7 +75,10 @@ class ProjectDescription {
   long[] lastExternTimes;
 
   ProjectDescription(JSONObject contents) throws JSONException {
-    target = contents.getString("target");
+    if (contents.has("target")) {
+      target = contents.getString("target");
+    }
+
     sources = Globals.parseStrings(contents, "sources");
     externs = Globals.parseStrings(contents, "externs");
     before = Globals.parseStrings(contents, "before");
@@ -472,6 +475,9 @@ public class ClosureCompilerBuilder {
   }
 
   boolean createLinkedTargetFile() {
+    if (project.target == null) {
+      return true;
+    }
     PrintWriter writer;
     try {
       writer = new PrintWriter(project.target);
@@ -489,6 +495,9 @@ public class ClosureCompilerBuilder {
   }
 
   boolean createOptimizedTargetFile(Compiler compiler) {
+    if (project.target == null) {
+      return true;
+    }
     PrintWriter writer;
     try {
       writer = new PrintWriter(project.target);
@@ -616,10 +625,10 @@ public class ClosureCompilerBuilder {
     System.out.println("Project format (JSON):");
     System.out.println("{");
     System.out.println("  // Required");
-    System.out.println("  \"target\": \"compiled.js\",");
     System.out.println("  \"sources\": [\"foo.js\", \"bar.js\"],");
     System.out.println("");
     System.out.println("  // Optional");
+    System.out.println("  \"target\": \"compiled.js\",");
     System.out.println("  \"externs\": [\"jquery.externs.js\"],");
     System.out.println("  \"before\": [\"before.sh\"],");
     System.out.println("  \"after\": [\"after.sh\"],");
