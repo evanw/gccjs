@@ -259,9 +259,15 @@ public class ClosureCompilerBuilder {
   static final List<SourceFile> defaultExterns = new ArrayList<SourceFile>();
 
   static {
-    defaultExterns.add(SourceFile.fromCode("console_log.js",
-      "var console = {};" +
-      "/** @type {function(...)} */ console.log;"));
+    defaultExterns.add(SourceFile.fromCode("gccjs/externs.js",
+      "var console = {};\n" +
+      "/** @type {function(...)} */ console.log;\n" +
+      "\n" +
+      "var performance = {};\n" +
+      "/** @type {function(): number} */ performance.now;\n" +
+      "\n" +
+      "/** @type {function(number)} */ var cancelAnimationFrame;\n" +
+    ""));
 
     try {
       defaultExterns.addAll(CommandLineRunner.getDefaultExterns());
