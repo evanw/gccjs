@@ -9,6 +9,6 @@
     "install": "./install.sh"
   },
   "dependencies": {
-    "terminal-notifier": "0.1.0"
+    "terminal-notifier": "0.1.1"
   }
 }
