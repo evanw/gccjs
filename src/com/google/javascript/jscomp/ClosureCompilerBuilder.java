@@ -592,12 +592,12 @@ public class ClosureCompilerBuilder {
   }
 
   void showPopup(String text, String file, int line) {
-    String TERMINAL_NOTIFIER_PATH = "../../../../../node_modules/terminal-notifier/" +
-      "terminal-notifier.app/Contents/MacOS/terminal-notifier";
+    String TERMINAL_NOTIFIER_PATH = "../../../../../node_modules/terminal-notifier/terminal-notifier.js";
     String path = ClosureCompilerBuilder.class.getResource("ClosureCompilerBuilder.class").getPath();
     path = new File(new File(path).getAbsoluteFile().getParent(), TERMINAL_NOTIFIER_PATH).getAbsolutePath();
     try {
       Runtime.getRuntime().exec(new String[] {
+        "node",
         path,
         "-title", "Google Closure Compiler",
         "-group", "closure-compiler-builder",
