@@ -1,6 +1,6 @@
 # gccjs
 
-A simple build tool that uses Google Closure Compiler's Java API to watch files in IDE mode for faster type checking. It also integrates error reporting into OS X Lion's notification system.
+A simple build tool that uses Google Closure Compiler's Java API to watch files in IDE mode for faster type checking. In watch mode, it integrates error reporting into OS X Lion's notification system using [node-terminal-notifier](https://github.com/evanw/node-terminal-notifier). It also contains special minification rules for WebGL code including GLSL minification (run `gccjs -o` in the example folder to see it in action).
 
 ### Options:
 

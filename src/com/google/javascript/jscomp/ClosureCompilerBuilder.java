@@ -6,7 +6,6 @@ import com.google.common.io.*;
 import com.google.javascript.jscomp.Compiler;
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.logging.*;
 import org.json.*;
 import org.kohsuke.args4j.*;

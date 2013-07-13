@@ -1,11 +1,22 @@
 package com.google.javascript.jscomp;
 
 import com.google.common.base.Preconditions;
-import com.google.javascript.rhino.Node;
+import com.google.common.collect.Lists;
+import com.google.javascript.rhino.*;
 import com.google.javascript.rhino.jstype.JSType;
 import java.util.*;
+import java.util.Map.Entry;
+import java.util.regex.*;
 
 class OptimizeWebGLPass extends NodeTraversal.AbstractPostOrderCallback implements CompilerPass {
+  // Annotate strings containing GLSL with "/** @const {GLSL} */"
+  static final String GLSL_TYPEDEF = "GLSL";
+
+  static final DiagnosticType UNSUPPORTED_CONST_GLSL_SYNTAX = DiagnosticType.warning(
+    "JSC_UNSUPPORTED_CONST_GLSL_SYNTAX",
+    "Unsupported syntax after \"@const '{" + GLSL_TYPEDEF + "}'\". " +
+    "Only variable and assignment statements are supported.");
+
   AbstractCompiler compiler;
   JSType contextType;
 
@@ -318,14 +329,46 @@ class OptimizeWebGLPass extends NodeTraversal.AbstractPostOrderCallback implemen
   @Override
   public void process(Node externs, Node root) {
     NodeTraversal.traverse(compiler, root, this);
+    minifyGLSL();
   }
 
   @Override
-  public void visit(NodeTraversal nt, Node node, Node parent) {
-    if (!node.isGetProp()) {
-      return;
+  public void visit(NodeTraversal t, Node node, Node parent) {
+    JSDocInfo info = node.getJSDocInfo();
+    if (info != null && info.isConstant() && info.getType() != null) {
+      Node root = info.getType().getRoot();
+      if (root.isString() && root.getString().equals(GLSL_TYPEDEF)) {
+        handleGLSL(t, node);
+        return;
+      }
     }
+    if (node.isGetProp()) {
+      replaceWebGLRenderingContextProperty(node, parent);
+    }
+  }
 
+  HashMap<Node, String> glslStringConstants = new HashMap<Node, String>();
+
+  void handleGLSL(NodeTraversal t, Node node) {
+    if (node.isVar()) {
+      for (Node c = node.getFirstChild(); c != null; c = c.getNext()) {
+        Preconditions.checkState(c.isName());
+        Node value = c.getFirstChild();
+        if (value != null && value.getJSType().isString()) {
+          glslStringConstants.put(value, value.getString());
+        }
+      }
+    } else if (node.isAssign()) {
+      Node value = node.getLastChild();
+      if (value != null && value.getJSType().isString()) {
+        glslStringConstants.put(value, value.getString());
+      }
+    } else {
+      compiler.report(t.makeError(node, UNSUPPORTED_CONST_GLSL_SYNTAX));
+    }
+  }
+
+  void replaceWebGLRenderingContextProperty(Node node, Node parent) {
     JSType type = node.getFirstChild().getJSType().restrictByNotNullOrUndefined();
     if (type == contextType) {
       String name = node.getLastChild().getString();
@@ -334,6 +377,298 @@ class OptimizeWebGLPass extends NodeTraversal.AbstractPostOrderCallback implemen
         parent.replaceChild(node, NodeUtil.numberNode(constant, node));
         compiler.reportCodeChange();
       }
+    }
+  }
+
+  // From the GLSL specification version 1.20:
+  // http://www.opengl.org/registry/doc/GLSLangSpec.Full.1.20.8.pdf
+  static final HashSet<String> GLSL_KEYWORDS = new HashSet<String>() {{
+    // Keywords
+    add("attribute");
+    add("const");
+    add("uniform");
+    add("varying");
+    add("break");
+    add("continue");
+    add("do");
+    add("for");
+    add("while");
+    add("if");
+    add("else");
+    add("in");
+    add("out");
+    add("inout");
+    add("float");
+    add("int");
+    add("void");
+    add("bool");
+    add("true");
+    add("false");
+    add("lowp");
+    add("mediump");
+    add("highp");
+    add("precision");
+    add("invariant");
+    add("discard");
+    add("return");
+    add("mat2");
+    add("mat3");
+    add("mat4");
+    add("vec2");
+    add("vec3");
+    add("vec4");
+    add("ivec2");
+    add("ivec3");
+    add("ivec4");
+    add("bvec2");
+    add("bvec3");
+    add("bvec4");
+    add("sampler2D");
+    add("samplerCube");
+    add("struct");
+
+    // Reserved
+    add("asm");
+    add("class");
+    add("union");
+    add("enum");
+    add("typedef");
+    add("template");
+    add("this");
+    add("packed");
+    add("goto");
+    add("switch");
+    add("default");
+    add("inline");
+    add("noinline");
+    add("volatile");
+    add("public");
+    add("static");
+    add("extern");
+    add("external");
+    add("interface");
+    add("flat");
+    add("long");
+    add("short");
+    add("double");
+    add("half");
+    add("fixed");
+    add("unsigned");
+    add("superp");
+    add("input");
+    add("output");
+    add("hvec2");
+    add("hvec3");
+    add("hvec4");
+    add("dvec2");
+    add("dvec3");
+    add("dvec4");
+    add("fvec2");
+    add("fvec3");
+    add("fvec4");
+    add("sampler1D");
+    add("sampler3D");
+    add("sampler1DShadow");
+    add("sampler2DShadow");
+    add("sampler2DRect");
+    add("sampler3DRect");
+    add("sampler2DRectShadow");
+    add("sizeof");
+    add("cast");
+    add("namespace");
+    add("using");
+
+    // Built-in functions
+    add("radians");
+    add("degrees");
+    add("sin");
+    add("cos");
+    add("tan");
+    add("asin");
+    add("acos");
+    add("atan");
+    add("pow");
+    add("exp");
+    add("log");
+    add("exp2");
+    add("log2");
+    add("sqrt");
+    add("inversesqrt");
+    add("abs");
+    add("sign");
+    add("floor");
+    add("ceil");
+    add("fract");
+    add("mod");
+    add("min");
+    add("max");
+    add("clamp");
+    add("mix");
+    add("step");
+    add("smoothstep");
+    add("length");
+    add("distance");
+    add("dot");
+    add("cross");
+    add("normalize");
+    add("faceforward");
+    add("reflect");
+    add("refract");
+    add("matrixCompMult");
+    add("lessThan");
+    add("lessThanEqual");
+    add("greaterThan");
+    add("greaterThanEqual");
+    add("equal");
+    add("notEqual");
+    add("any");
+    add("all");
+    add("not");
+    add("texture2D");
+    add("texture2DProj");
+    add("texture2DLod");
+    add("texture2DProjLod");
+    add("texture2DCube");
+    add("texture2DCubeLod");
+
+    // Extra
+    add("main");
+    add("defined");
+    add("dFdx");
+    add("dFdy");
+    add("require");
+    add("warn");
+    add("enable");
+    add("disable");
+  }};
+
+  // Both /* style */ and // comments
+  static final Pattern GLSL_COMMENTS = Pattern.compile(
+    "(\\/\\*(?:[^\\*]|\\*[^\\/])*\\*\\/|\\/\\/[^\\n]*)");
+
+  // This includes # or . in the name since it's easier that way
+  static final Pattern GLSL_IDENTIFIERS = Pattern.compile(
+    "(?:#|\\.|\\b)(?!gl_|GL_|OES_|EXT_|WEBGL_|ANGLE_|__)[A-Za-z_][A-Za-z_0-9]*\\b");
+
+  // This assumes that tightenSpaces() has already been run
+  static final Pattern VARIABLE_DECLARATIONS = Pattern.compile(
+    "(^|[{};])((?:uniform|attribute|varying|const) )?(float|int|bool|mat2|" +
+    "mat3|mat4|vec2|vec3|vec4|ivec2|ivec3|ivec4|bvec2|bvec3|bvec4|sampler2D|" +
+    "samplerCube) ([^;]+);(?:\\2)?\\3 ([^;]+);");
+
+  static String removeComments(String glsl) {
+    return GLSL_COMMENTS.matcher(glsl).replaceAll("");
+  }
+
+  static String replace(String source, String pattern, String replace) {
+    return Pattern.compile(pattern).matcher(source).replaceAll(replace);
+  }
+
+  static String tightenSpaces(String glsl) {
+    // Shrink consecutive spaces into a single space of the same type
+    glsl = glsl.trim();
+    glsl = replace(glsl, "[ \t]+", " ");
+    glsl = replace(glsl, "([\r\n][ \t]+|[ \t]+[\r\n])", "\n");
+    glsl = replace(glsl, "[\r\n]+", "\n");
+
+    // These symbols are safe to shrink all space on both sides
+    glsl = replace(glsl, "[ \t]*([.,;:?|&^*/=!<>(){}\\[\\]])[ \t]*", "$1");
+
+    // Be careful about things like "a - --b"
+    glsl = replace(glsl, "\\+[ \t]+(?!\\+)", "+");
+    glsl = replace(glsl, "\\-[ \t]+(?!\\-)", "-");
+    glsl = replace(glsl, "([^\\+])[ \t]+\\+", "$1+");
+    glsl = replace(glsl, "([^\\-])[ \t]+\\-", "$1-");
+    return glsl;
+  }
+
+  static String combineAdjacentVariableDeclarations(String glsl) {
+    String previous;
+    do {
+      previous = glsl;
+      glsl = VARIABLE_DECLARATIONS.matcher(glsl).replaceFirst("$1$2$3 $4,$5;");
+    } while (!glsl.equals(previous));
+    return glsl;
+  }
+
+  static boolean isReserved(String name) {
+    return name.startsWith("#") || name.startsWith(".") ||
+           GLSL_KEYWORDS.contains(name);
+  }
+
+  static void findNames(String glsl, HashMap<String, Integer> names) {
+    Matcher matcher = GLSL_IDENTIFIERS.matcher(glsl);
+    while (matcher.find()) {
+      String name = matcher.group();
+      if (!isReserved(name)) {
+        Integer count = names.get(name);
+        names.put(name, count == null ? 1 : count + 1);
+      }
+    }
+  }
+
+  static String replaceNames(String glsl, HashMap<String, String> renaming) {
+    Matcher matcher = GLSL_IDENTIFIERS.matcher(glsl);
+    StringBuffer buffer = new StringBuffer();
+    while (matcher.find()) {
+      String name = matcher.group();
+      matcher.appendReplacement(buffer,
+        isReserved(name) ? name : renaming.get(name));
+    }
+    matcher.appendTail(buffer);
+    return buffer.toString();
+  }
+
+  static String numberToName(int number) {
+    String name = "";
+    if (number >= 52) {
+      name = numberToName(number / 52 - 1);
+      number = number % 52;
+    }
+    name += (char)((number < 26 ? 'a' : 'A' - 26) + number);
+    return name;
+  }
+
+  void minifyGLSL() {
+    HashMap<String, Integer> names = new HashMap<String, Integer>();
+
+    // Scan all string constants
+    for (Entry<Node, String> entry : glslStringConstants.entrySet()) {
+      Node node = entry.getKey();
+      String glsl = entry.getValue();
+      glsl = removeComments(glsl);
+      glsl = tightenSpaces(glsl);
+      glsl = combineAdjacentVariableDeclarations(glsl);
+      findNames(glsl, names);
+      glslStringConstants.put(node, glsl);
+    }
+
+    // Sort identifiers by usage count
+    ArrayList<Entry<String, Integer>> sorted = Lists.newArrayList(names.entrySet());
+    Collections.sort(sorted, new Comparator<Entry<String, Integer>>() {
+      @Override
+      public int compare(Entry<String, Integer> a, Entry<String, Integer> b) {
+        return b.getValue() - a.getValue();
+      }
+    });
+
+    // Shorten identifiers
+    HashMap<String, String> renaming = new HashMap<String, String>();
+    int next = 0;
+    for (Entry<String, Integer> entry : sorted) {
+      String name;
+      do {
+        name = numberToName(next++);
+      } while (isReserved(name));
+      renaming.put(entry.getKey(), name);
+    }
+
+    // Replace all string constants
+    for (Entry<Node, String> entry : glslStringConstants.entrySet()) {
+      Node node = entry.getKey();
+      String glsl = entry.getValue();
+      glsl = replaceNames(glsl, renaming);
+      node.getParent().replaceChild(node, IR.string(glsl));
     }
   }
 }
