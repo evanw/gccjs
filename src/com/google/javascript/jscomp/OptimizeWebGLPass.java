@@ -543,6 +543,9 @@ class OptimizeWebGLPass extends NodeTraversal.AbstractPostOrderCallback implemen
   }};
 
   // Both /* style */ and // comments
+  static final Pattern PREPROCESSOR_COMMAND = Pattern.compile("^[ \t]*#");
+
+  // Both /* style */ and // comments
   static final Pattern GLSL_COMMENTS = Pattern.compile(
     "(\\/\\*(?:[^\\*]|\\*[^\\/])*\\*\\/|\\/\\/[^\\n]*)");
 
@@ -565,20 +568,28 @@ class OptimizeWebGLPass extends NodeTraversal.AbstractPostOrderCallback implemen
   }
 
   static String tightenSpaces(String glsl) {
+    // Join lines being careful about preprocessor commands
+    StringBuilder builder = new StringBuilder();
+    for (String line : glsl.split("\n")) {
+      builder.append(line).append(
+        PREPROCESSOR_COMMAND.matcher(line).find() ? '\n' : ' ');
+    }
+    glsl = builder.toString();
+
     // Shrink consecutive spaces into a single space of the same type
     glsl = glsl.trim();
     glsl = replace(glsl, "[ \t]+", " ");
-    glsl = replace(glsl, "([\r\n][ \t]+|[ \t]+[\r\n])", "\n");
+    glsl = replace(glsl, " *[\r\n] *", "\n");
     glsl = replace(glsl, "[\r\n]+", "\n");
 
     // These symbols are safe to shrink all space on both sides
-    glsl = replace(glsl, "[ \t]*([.,;:?|&^*/=!<>(){}\\[\\]])[ \t]*", "$1");
+    glsl = replace(glsl, " *([.,;:?|&^*/=!<>(){}\\[\\]]) *", "$1");
 
     // Be careful about things like "a - --b"
-    glsl = replace(glsl, "\\+[ \t]+(?!\\+)", "+");
-    glsl = replace(glsl, "\\-[ \t]+(?!\\-)", "-");
-    glsl = replace(glsl, "([^\\+])[ \t]+\\+", "$1+");
-    glsl = replace(glsl, "([^\\-])[ \t]+\\-", "$1-");
+    glsl = replace(glsl, "\\+ +(?!\\+)", "+");
+    glsl = replace(glsl, "\\- +(?!\\-)", "-");
+    glsl = replace(glsl, "([^\\+]) +\\+", "$1+");
+    glsl = replace(glsl, "([^\\-]) +\\-", "$1-");
     return glsl;
   }
 
