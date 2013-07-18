@@ -13,6 +13,12 @@ import org.kohsuke.args4j.spi.*;
 
 class Flags {
   @Option(
+    name = "--run-tests",
+    handler = BooleanOptionHandler.class,
+    usage = "Runs internal tests")
+  boolean runTests = false;
+
+  @Option(
     name = "--help",
     aliases = { "-h" },
     handler = BooleanOptionHandler.class,
@@ -202,6 +208,13 @@ class Globals {
 class CustomPassConfig extends DefaultPassConfig {
   Flags flags;
 
+  static final PassFactory captureAwareRenaming = new PassFactory("captureAwareRenaming", false) {
+    @Override
+    CompilerPass create(AbstractCompiler compiler) {
+      return new CaptureAwareRenamingPass(compiler);
+    }
+  };
+
   static final PassFactory optimizeWebGL = new PassFactory("optimizeWebGL", true) {
     @Override
     CompilerPass create(AbstractCompiler compiler) {
@@ -224,6 +237,7 @@ class CustomPassConfig extends DefaultPassConfig {
   @Override
   protected List<PassFactory> getOptimizations() {
     ArrayList<PassFactory> optimizations = new ArrayList<PassFactory>();
+    optimizations.add(captureAwareRenaming);
     optimizations.add(optimizeWebGL);
     optimizations.addAll(super.getOptimizations());
     insertAfter(optimizations, "peepholeOptimizations", peepholeOptimize);
@@ -255,10 +269,10 @@ public class ClosureCompilerBuilder {
   boolean latestBuildSucceeded;
 
   static final DiagnosticType ERROR = DiagnosticType.error("ERROR", "{0}");
-  static final List<SourceFile> defaultExterns = new ArrayList<SourceFile>();
+  static final List<SourceFile> DEFAULT_EXTERNS = new ArrayList<SourceFile>();
 
   static {
-    defaultExterns.add(SourceFile.fromCode("gccjs/externs.js",
+    DEFAULT_EXTERNS.add(SourceFile.fromCode("gccjs/externs.js",
       "var console = {};\n" +
       "/** @type {function(...)} */ console.log;\n" +
       "\n" +
@@ -269,7 +283,7 @@ public class ClosureCompilerBuilder {
     ""));
 
     try {
-      defaultExterns.addAll(CommandLineRunner.getDefaultExterns());
+      DEFAULT_EXTERNS.addAll(CommandLineRunner.getDefaultExterns());
     } catch (IOException e) {
     }
   }
@@ -325,39 +339,17 @@ public class ClosureCompilerBuilder {
       removeTargetFile();
     }
 
-    // Initialize the compiler
-    Compiler compiler = new Compiler();
-    List<SourceFile> externs = new ArrayList<SourceFile>(defaultExterns);
-    JSModule module = new JSModule("target");
+    // Run the compiler
+    List<SourceFile> externs = new ArrayList<SourceFile>(DEFAULT_EXTERNS);
+    List<SourceFile> sources = new ArrayList<SourceFile>();
     for (String extern : project.externs) {
       externs.add(SourceFile.fromFile(extern, Charsets.UTF_8));
     }
     for (String source : project.sources) {
-      module.add(SourceFile.fromFile(source, Charsets.UTF_8));
+      sources.add(SourceFile.fromFile(source, Charsets.UTF_8));
     }
-
-    // Initialize compiler options
-    CompilerOptions options = new CompilerOptions();
-    WarningLevel.VERBOSE.setOptionsForWarningLevel(options);
-    CompilationLevel.ADVANCED_OPTIMIZATIONS.setOptionsForCompilationLevel(options);
-    CompilationLevel.ADVANCED_OPTIMIZATIONS.setTypeBasedOptimizationOptions(options);
-    for (Define define : project.defines) {
-      define.apply(options);
-    }
-    options.ideMode = !flags.optimizedBuild;
-    options.setTrustedStrings(true);
-
-    // Run the compiler without printing anything
-    Compiler.setLoggingLevel(Level.OFF);
-    compiler.setPassConfig(new CustomPassConfig(options, flags));
-    compiler.setErrorManager(new BasicErrorManager() {
-      @Override
-      public void println(CheckLevel level, JSError error) {}
-
-      @Override
-      protected void printSummary() {}
-    });
-    Result result = compiler.compileModules(externs, Arrays.asList(module), options);
+    Compiler compiler = new Compiler();
+    Result result = compile(compiler, externs, sources, Arrays.asList(project.defines), flags);
 
     // Report diagnostics
     for (JSError error : result.errors) {
@@ -376,6 +368,38 @@ public class ClosureCompilerBuilder {
     } else {
       reportSuccess();
     }
+  }
+
+  static Result compile(Compiler compiler, List<SourceFile> externs,
+      List<SourceFile> sources, List<Define> defines, Flags flags) {
+    // Initialize the compiler
+    JSModule module = new JSModule("target");
+    for (SourceFile source : sources) {
+      module.add(source);
+    }
+
+    // Initialize compiler options
+    CompilerOptions options = new CompilerOptions();
+    WarningLevel.VERBOSE.setOptionsForWarningLevel(options);
+    CompilationLevel.ADVANCED_OPTIMIZATIONS.setOptionsForCompilationLevel(options);
+    CompilationLevel.ADVANCED_OPTIMIZATIONS.setTypeBasedOptimizationOptions(options);
+    for (Define define : defines) {
+      define.apply(options);
+    }
+    options.ideMode = !flags.optimizedBuild;
+    options.setTrustedStrings(true);
+
+    // Run the compiler without printing anything
+    Compiler.setLoggingLevel(Level.OFF);
+    compiler.setPassConfig(new CustomPassConfig(options, flags));
+    compiler.setErrorManager(new BasicErrorManager() {
+      @Override
+      public void println(CheckLevel level, JSError error) {}
+
+      @Override
+      protected void printSummary() {}
+    });
+    return compiler.compileModules(externs, Arrays.asList(module), options);
   }
 
   boolean runCommands(String[] commands) {
@@ -474,7 +498,7 @@ public class ClosureCompilerBuilder {
         poll(false);
       } catch (Throwable t) {
         showPopup(t.getMessage(), null, 0);
-        t.printStackTrace();
+        t.printStackTrace(System.out);
       }
     }
   }
@@ -652,11 +676,17 @@ public class ClosureCompilerBuilder {
       if (flags.showHelp) {
         usage(parser);
       } else {
+        // Run tests from here
+        if (flags.runTests) {
+          Tests.run();
+          System.exit(0);
+        }
+
         // Catch internal compiler errors
         try {
           new ClosureCompilerBuilder(flags).run();
         } catch (Throwable t) {
-          t.printStackTrace();
+          t.printStackTrace(System.out);
 
           // Need to explicitly exit because of extra threads
           System.exit(1);
