@@ -62,6 +62,13 @@ class Flags {
     handler = StringOptionHandler.class,
     usage = "The project file (defaults to project.json)")
   String projectFile = "project.json";
+
+  @Option(
+    name = "--formatted",
+    aliases = { "-f" },
+    handler = BooleanOptionHandler.class,
+    usage = "Pretty-print the output (relevant for --optimize)")
+  boolean formatted = false;
 }
 
 interface Define {
@@ -380,6 +387,7 @@ public class ClosureCompilerBuilder {
 
     // Initialize compiler options
     CompilerOptions options = new CompilerOptions();
+    options.prettyPrint = flags.formatted;
     WarningLevel.VERBOSE.setOptionsForWarningLevel(options);
     CompilationLevel.ADVANCED_OPTIMIZATIONS.setOptionsForCompilationLevel(options);
     CompilationLevel.ADVANCED_OPTIMIZATIONS.setTypeBasedOptimizationOptions(options);
