@@ -1,0 +1,13 @@
+#!/usr/bin/env node
+
+var fs = require('fs');
+var path = require('path');
+var child_process = require('child_process');
+
+// Grab the directory containing this file
+var dir = path.dirname(fs.realpathSync(__filename));
+
+// Forward arguments to the builder
+child_process.spawn('java',
+  ['-cp', dir + '/src:' + dir + '/compiler.jar', 'com.google.javascript.jscomp.ClosureCompilerBuilder'].concat(process.argv.slice(2)),
+  { stdio: 'inherit' });

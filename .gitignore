@@ -1,4 +1,3 @@
 /node_modules/
-/compiler.jar
 /example/output.js
 *.class
