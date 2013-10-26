@@ -6,6 +6,7 @@ import com.google.common.io.*;
 import com.google.javascript.jscomp.Compiler;
 import java.io.*;
 import java.util.*;
+import java.util.regex.*;
 import java.util.logging.*;
 import org.json.*;
 import org.kohsuke.args4j.*;
@@ -157,8 +158,9 @@ class Globals {
   // Manual implementation of relative paths because Java sucks
   static String relativePath(String path, String relativeDir) {
     // Skip past common parts
-    String[] pathParts = new File(path).getAbsolutePath().split(File.separator);
-    String[] relativeParts = new File(relativeDir).getAbsolutePath().split(File.separator);
+    String pattern = Pattern.quote(File.separator);
+    String[] pathParts = new File(path).getAbsolutePath().split(pattern);
+    String[] relativeParts = new File(relativeDir).getAbsolutePath().split(pattern);
     int i = 0;
     while (i < pathParts.length && i < relativeParts.length && pathParts[i].equals(relativeParts[i])) {
       i++;
