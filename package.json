@@ -2,12 +2,12 @@
   "name": "gccjs",
   "description": "A simple build tool that uses Google Closure Compiler",
   "repository": "https://github.com/evanw/gccjs.git",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "bin": {
     "gccjs": "./gccjs"
   },
   "scripts": {
-    "install": "javac -cp compiler.jar src/com/google/javascript/jscomp/*.java"
+    "build": "javac -cp compiler.jar src/com/google/javascript/jscomp/*.java"
   },
   "dependencies": {
     "terminal-notifier": "0.1.2"
