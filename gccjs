@@ -7,7 +7,17 @@ var child_process = require('child_process');
 // Grab the directory containing this file
 var dir = path.dirname(fs.realpathSync(__filename));
 
+var java = 'java';
+var isWindows = fs.existsSync('C:\\');
+if (isWindows) {
+  var file = 'C:\\Program Files (x86)\\Java\\jre7\\bin\\java.exe';
+  if (fs.existsSync(file)) {
+    java = file;
+  }
+}
+
 // Forward arguments to the builder
-child_process.spawn('java',
-  ['-cp', dir + '/src:' + dir + '/compiler.jar', 'com.google.javascript.jscomp.ClosureCompilerBuilder'].concat(process.argv.slice(2)),
-  { stdio: 'inherit' });
+var classPath = [path.join(dir, 'src'), path.join(dir, 'compiler.jar')];
+var args = ['-cp', classPath.join(isWindows ? ';' : ':'), 'com.google.javascript.jscomp.ClosureCompilerBuilder'].concat(process.argv.slice(2));
+console.log([java].concat(args).join(' '));
+child_process.spawn(java, args, { stdio: 'inherit' });
