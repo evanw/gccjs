@@ -2,7 +2,7 @@
   "name": "gccjs",
   "description": "A simple build tool that uses Google Closure Compiler",
   "repository": "https://github.com/evanw/gccjs.git",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "bin": {
     "gccjs": "./gccjs"
   },
